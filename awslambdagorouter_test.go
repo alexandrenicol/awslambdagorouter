@@ -9,6 +9,16 @@ import (
 )
 
 func test1(request RouterRequest) map[string]interface{} {
+	return map[string]interface{}{
+		"success": "true",
+	}
+}
+func test2(request RouterRequest) map[string]interface{} {
+	return map[string]interface{}{
+		"success": "true",
+	}
+}
+func test3(request RouterRequest) map[string]interface{} {
 	return request.Body
 }
 
@@ -17,29 +27,74 @@ func TestRouter(t *testing.T) {
 		testRequest      events.APIGatewayProxyRequest
 		expectedResponse events.APIGatewayProxyResponse
 	}{
-		//test1
+		//test that get functions are registered and can be executed properly
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/",
-				Body:       `{"test":"test"}`,
+				Body:       "",
 				HTTPMethod: "GET",
 			},
 			expectedResponse: events.APIGatewayProxyResponse{
-				Body: `{"test":"test"}`,
+				Body: `{"success":"true"}`,
 			},
 		},
 		{
 			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/test",
+				Body:       "",
+				HTTPMethod: "GET",
+			},
+			expectedResponse: events.APIGatewayProxyResponse{
+				Body: `{"success":"true"}`,
+			},
+		},
+		//test that it returns a 404 if the path does not exist
+		{
+			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/path",
-				Body:       `{"test":"test"}`,
+				Body:       "",
 				HTTPMethod: "GET",
 			},
 			expectedResponse: response404,
+		},
+		//test that it returns a 404 if the method does no exist, even for an existing path
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/",
+				Body:       "",
+				HTTPMethod: "DELETE",
+			},
+			expectedResponse: response404,
+		},
+		//test POST request
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/",
+				Body:       `{"success":"true", "data":[0,1,2]}`,
+				HTTPMethod: "POST",
+			},
+			expectedResponse: events.APIGatewayProxyResponse{
+				Body: `{"success":"true"}`,
+			},
+		},
+		//test POST request
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/test",
+				Body:       `{"success":"true", "data":[0,1,2]}`,
+				HTTPMethod: "POST",
+			},
+			expectedResponse: events.APIGatewayProxyResponse{
+				Body: `{"data":[0,1,2],"success":"true"}`,
+			},
 		},
 	}
 	for index, c := range cases {
 		router := start()
 		router.get("/", test1)
+		router.get("/test", test1)
+		router.post("/", test2)
+		router.post("/test", test3)
 		got, err := router.serve(c.testRequest)
 
 		var logger strings.Builder
@@ -51,6 +106,9 @@ func TestRouter(t *testing.T) {
 			t.Errorf("Test resulted in an error")
 			continue
 		}
+
+		println(got.Body)
+		println(c.expectedResponse.Body)
 
 		if got.Body != c.expectedResponse.Body {
 			t.Errorf("Test not passed, the response's body is different")

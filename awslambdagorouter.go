@@ -20,10 +20,14 @@ type RouterRequest struct {
 }
 
 func convertBodyToJSON(request events.APIGatewayProxyRequest) RouterRequest {
+
 	var body map[string]interface{}
-	if err := json.Unmarshal([]byte(request.Body), &body); err != nil {
-		panic(err)
+	if request.Body != "" {
+		if err := json.Unmarshal([]byte(request.Body), &body); err != nil {
+			panic(err)
+		}
 	}
+
 	return RouterRequest{
 		Resource:              request.Resource,
 		Path:                  request.Path,
@@ -85,7 +89,6 @@ func (r Router) post(path string, callback CallbackFunction) {
 func (r Router) serve(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	path := request.Path
 	method := strings.ToLower(request.HTTPMethod)
-	convertedRequest := convertBodyToJSON(request)
 
 	var callbackFunction CallbackFunction
 
@@ -96,6 +99,7 @@ func (r Router) serve(request events.APIGatewayProxyRequest) (events.APIGatewayP
 	}
 
 	if callbackFunction != nil {
+		convertedRequest := convertBodyToJSON(request)
 		data := callbackFunction(convertedRequest)
 		response := createResponse(data)
 		return response, nil
