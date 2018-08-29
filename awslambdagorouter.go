@@ -21,10 +21,10 @@ type RouterRequest struct {
 
 func convertBodyToJSON(request events.APIGatewayProxyRequest) RouterRequest {
 
-	var body map[string]interface{}
+	body := make(map[string]interface{})
 	if request.Body != "" {
 		if err := json.Unmarshal([]byte(request.Body), &body); err != nil {
-			panic(err)
+			panic("Unable to decode JSON")
 		}
 	}
 
@@ -70,6 +70,13 @@ var response404 = events.APIGatewayProxyResponse{
 	Body:       "Route not found for this method",
 }
 
+func response400(response string) events.APIGatewayProxyResponse {
+	return events.APIGatewayProxyResponse{
+		StatusCode: 400,
+		Body:       response,
+	}
+}
+
 func start() Router {
 	routerFunctions := RouterFunctions{
 		get:  map[string]CallbackFunction{},
@@ -86,7 +93,19 @@ func (r Router) post(path string, callback CallbackFunction) {
 	r.functions.post[path] = callback
 }
 
-func (r Router) serve(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func (r Router) serve(request events.APIGatewayProxyRequest) (response events.APIGatewayProxyResponse, err error) {
+	println("serving")
+	//var response events.APIGatewayProxyResponse
+
+	defer func() {
+		if r := recover(); r != nil {
+			if r == "Unable to decode JSON" {
+				//println(r.(string))
+				response = response400(r.(string))
+			}
+		}
+	}()
+
 	path := request.Path
 	method := strings.ToLower(request.HTTPMethod)
 
@@ -101,10 +120,13 @@ func (r Router) serve(request events.APIGatewayProxyRequest) (events.APIGatewayP
 	if callbackFunction != nil {
 		convertedRequest := convertBodyToJSON(request)
 		data := callbackFunction(convertedRequest)
-		response := createResponse(data)
-		return response, nil
+		response = createResponse(data)
+		//return response, nil
+	} else {
+		response = response404
 	}
 
-	return response404, nil
+	println("responding")
+	return response, err
 
 }
