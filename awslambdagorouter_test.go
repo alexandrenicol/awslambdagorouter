@@ -22,6 +22,16 @@ func test3(request RouterRequest) map[string]interface{} {
 	return request.Body
 }
 
+func test4(request RouterRequest) map[string]interface{} {
+	return map[string]interface{}{
+		"data": map[string]string{
+			"category": request.QueryStringParameters["category"],
+			"campaign": request.QueryStringParameters["campaign"],
+		},
+		"success": "true",
+	}
+}
+
 func TestRouter(t *testing.T) {
 	cases := []struct {
 		testRequest      events.APIGatewayProxyRequest
@@ -66,7 +76,7 @@ func TestRouter(t *testing.T) {
 			},
 			expectedResponse: response404,
 		},
-		//test POST request
+		//test POST request routing
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/",
@@ -77,7 +87,7 @@ func TestRouter(t *testing.T) {
 				Body: `{"success":"true"}`,
 			},
 		},
-		//test POST request
+		//test POST request parameters transit
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/test",
@@ -88,6 +98,20 @@ func TestRouter(t *testing.T) {
 				Body: `{"data":[0,1,2],"success":"true"}`,
 			},
 		},
+		//test GET request query string parameters transit
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/query",
+				HTTPMethod: "GET",
+				QueryStringParameters: map[string]string{
+					"category": "one",
+					"campaign": "test",
+				},
+			},
+			expectedResponse: events.APIGatewayProxyResponse{
+				Body: `{"data":{"campaign":"test","category":"one"},"success":"true"}`,
+			},
+		},
 	}
 	for index, c := range cases {
 		router := start()
@@ -95,6 +119,7 @@ func TestRouter(t *testing.T) {
 		router.get("/test", test1)
 		router.post("/", test2)
 		router.post("/test", test3)
+		router.get("/query", test4)
 		got, err := router.serve(c.testRequest)
 
 		var logger strings.Builder
