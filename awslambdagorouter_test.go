@@ -13,13 +13,18 @@ func test1(request RouterRequest) map[string]interface{} {
 		"success": "true",
 	}
 }
-func test2(request RouterRequest) map[string]interface{} {
-	return map[string]interface{}{
-		"success": "true",
-	}
-}
 func test3(request RouterRequest) map[string]interface{} {
 	return request.Body
+}
+
+func test4(request RouterRequest) map[string]interface{} {
+	return map[string]interface{}{
+		"data": map[string]string{
+			"category": request.QueryStringParameters["category"],
+			"campaign": request.QueryStringParameters["campaign"],
+		},
+		"success": "true",
+	}
 }
 
 func TestRouter(t *testing.T) {
@@ -27,7 +32,7 @@ func TestRouter(t *testing.T) {
 		testRequest      events.APIGatewayProxyRequest
 		expectedResponse events.APIGatewayProxyResponse
 	}{
-		//test that get functions are registered and can be executed properly
+		// 0, 1, test that get functions are registered and can be executed properly
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/",
@@ -48,7 +53,7 @@ func TestRouter(t *testing.T) {
 				Body: `{"success":"true"}`,
 			},
 		},
-		//test that it returns a 404 if the path does not exist
+		//2, test that it returns a 404 if the path does not exist
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/path",
@@ -57,7 +62,7 @@ func TestRouter(t *testing.T) {
 			},
 			expectedResponse: response404,
 		},
-		//test that it returns a 404 if the method does no exist, even for an existing path
+		//3, test that it returns a 404 if the method does no exist, even for an existing path
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/",
@@ -66,7 +71,7 @@ func TestRouter(t *testing.T) {
 			},
 			expectedResponse: response404,
 		},
-		//test POST request
+		//4, test POST request routing
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/",
@@ -77,7 +82,7 @@ func TestRouter(t *testing.T) {
 				Body: `{"success":"true"}`,
 			},
 		},
-		//test POST request
+		//5, test POST request parameters transit
 		{
 			testRequest: events.APIGatewayProxyRequest{
 				Path:       "/test",
@@ -88,13 +93,61 @@ func TestRouter(t *testing.T) {
 				Body: `{"data":[0,1,2],"success":"true"}`,
 			},
 		},
+		//6, test POST request, with no body
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/noparam",
+				HTTPMethod: "POST",
+			},
+			expectedResponse: events.APIGatewayProxyResponse{
+				Body: "{}",
+			},
+		},
+		//7, test POST request, with empty body
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/noparam2",
+				Body:       "",
+				HTTPMethod: "POST",
+			},
+			expectedResponse: events.APIGatewayProxyResponse{
+				Body: "{}",
+			},
+		},
+		//8, test GET request query string parameters transit
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/query",
+				HTTPMethod: "GET",
+				QueryStringParameters: map[string]string{
+					"category": "one",
+					"campaign": "test",
+				},
+			},
+			expectedResponse: events.APIGatewayProxyResponse{
+				Body: `{"data":{"campaign":"test","category":"one"},"success":"true"}`,
+			},
+		},
+		//9 test POST request, with empty body
+		{
+			testRequest: events.APIGatewayProxyRequest{
+				Path:       "/unvalid",
+				Body:       `{"unfinishedJson`,
+				HTTPMethod: "POST",
+			},
+			expectedResponse: response400("Unable to decode JSON"),
+		},
 	}
 	for index, c := range cases {
 		router := start()
 		router.get("/", test1)
 		router.get("/test", test1)
-		router.post("/", test2)
+		router.post("/", test1)
 		router.post("/test", test3)
+		router.post("/noparam", test3)
+		router.post("/noparam2", test3)
+		router.post("/unvalid", test3)
+		router.get("/query", test4)
 		got, err := router.serve(c.testRequest)
 
 		var logger strings.Builder
