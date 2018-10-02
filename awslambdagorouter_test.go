@@ -8,16 +8,16 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 )
 
-func test1(request RouterRequest) map[string]interface{} {
+func test1(request RouterRequest) RouterResponse {
 	return map[string]interface{}{
 		"success": "true",
 	}
 }
-func test3(request RouterRequest) map[string]interface{} {
+func test3(request RouterRequest) RouterResponse {
 	return request.Body
 }
 
-func test4(request RouterRequest) map[string]interface{} {
+func test4(request RouterRequest) RouterResponse {
 	return map[string]interface{}{
 		"data": map[string]string{
 			"category": request.QueryStringParameters["category"],
@@ -139,16 +139,16 @@ func TestRouter(t *testing.T) {
 		},
 	}
 	for index, c := range cases {
-		router := start()
-		router.get("/", test1)
-		router.get("/test", test1)
-		router.post("/", test1)
-		router.post("/test", test3)
-		router.post("/noparam", test3)
-		router.post("/noparam2", test3)
-		router.post("/unvalid", test3)
-		router.get("/query", test4)
-		got, err := router.serve(c.testRequest)
+		router := Start()
+		router.Get("/", test1)
+		router.Get("/test", test1)
+		router.Post("/", test1)
+		router.Post("/test", test3)
+		router.Post("/noparam", test3)
+		router.Post("/noparam2", test3)
+		router.Post("/unvalid", test3)
+		router.Get("/query", test4)
+		got, err := router.Serve(c.testRequest)
 
 		var logger strings.Builder
 		logger.WriteString("Doing test number: ")

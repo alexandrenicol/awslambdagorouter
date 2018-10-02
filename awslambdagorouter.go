@@ -9,19 +9,22 @@ import (
 
 // RouterRequest ...
 type RouterRequest struct {
-	Resource              string                 `json:"resource"` // The resource path defined in API Gateway
-	Path                  string                 `json:"path"`     // The url path for the caller
-	HTTPMethod            string                 `json:"httpMethod"`
-	Headers               map[string]string      `json:"headers"`
-	QueryStringParameters map[string]string      `json:"queryStringParameters"`
-	PathParameters        map[string]string      `json:"pathParameters"`
-	Body                  map[string]interface{} `json:"body"`
-	IsBase64Encoded       bool                   `json:"isBase64Encoded,omitempty"`
+	Resource              string            `json:"resource"` // The resource path defined in API Gateway
+	Path                  string            `json:"path"`     // The url path for the caller
+	HTTPMethod            string            `json:"httpMethod"`
+	Headers               map[string]string `json:"headers"`
+	QueryStringParameters map[string]string `json:"queryStringParameters"`
+	PathParameters        map[string]string `json:"pathParameters"`
+	Body                  RouterResponse    `json:"body"`
+	IsBase64Encoded       bool              `json:"isBase64Encoded,omitempty"`
 }
+
+// RouterResponse ...
+type RouterResponse = map[string]interface{}
 
 func convertBodyToJSON(request events.APIGatewayProxyRequest) RouterRequest {
 
-	body := make(map[string]interface{})
+	body := make(RouterResponse)
 	if request.Body != "" {
 		if err := json.Unmarshal([]byte(request.Body), &body); err != nil {
 			panic("Unable to decode JSON")
@@ -40,7 +43,7 @@ func convertBodyToJSON(request events.APIGatewayProxyRequest) RouterRequest {
 	}
 }
 
-func createResponse(jsonData map[string]interface{}) events.APIGatewayProxyResponse {
+func createResponse(jsonData RouterResponse) events.APIGatewayProxyResponse {
 
 	body, _ := json.Marshal(jsonData)
 	return events.APIGatewayProxyResponse{
@@ -52,7 +55,7 @@ func createResponse(jsonData map[string]interface{}) events.APIGatewayProxyRespo
 }
 
 // CallbackFunction ...
-type CallbackFunction func(RouterRequest) map[string]interface{}
+type CallbackFunction func(RouterRequest) RouterResponse
 
 // RouterFunctions ...
 type RouterFunctions struct {
@@ -77,7 +80,8 @@ func response400(response string) events.APIGatewayProxyResponse {
 	}
 }
 
-func start() Router {
+// Start creates a Router
+func Start() Router {
 	routerFunctions := RouterFunctions{
 		get:  map[string]CallbackFunction{},
 		post: map[string]CallbackFunction{},
@@ -86,21 +90,22 @@ func start() Router {
 	return router
 }
 
-func (r Router) get(path string, callback CallbackFunction) {
+// Get ...
+func (r Router) Get(path string, callback CallbackFunction) {
 	r.functions.get[path] = callback
 }
-func (r Router) post(path string, callback CallbackFunction) {
+
+// Post ...
+func (r Router) Post(path string, callback CallbackFunction) {
 	r.functions.post[path] = callback
 }
 
-func (r Router) serve(request events.APIGatewayProxyRequest) (response events.APIGatewayProxyResponse, err error) {
-	println("serving")
-	//var response events.APIGatewayProxyResponse
+//Serve ...
+func (r Router) Serve(request events.APIGatewayProxyRequest) (response events.APIGatewayProxyResponse, err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
 			if r == "Unable to decode JSON" {
-				//println(r.(string))
 				response = response400(r.(string))
 			}
 		}
@@ -121,7 +126,6 @@ func (r Router) serve(request events.APIGatewayProxyRequest) (response events.AP
 		convertedRequest := convertBodyToJSON(request)
 		data := callbackFunction(convertedRequest)
 		response = createResponse(data)
-		//return response, nil
 	} else {
 		response = response404
 	}
